@@ -37,6 +37,12 @@ func (h *WebhookHandler) HandleGitHubWebhook(c *gin.Context) {
 			c.JSON(500, gin.H{"error": "Error al procesar el workflow"})
 			return
 		}
+	case "workflow_dispatch":
+		workflow := h.extractWorkflow(payload)
+		if err := h.notificationService.HandleWorkflow(workflow); err != nil {
+			c.JSON(500, gin.H{"error": "Error al procesar el workflow dispatch"})
+			return
+		}
 	}
 
 	c.JSON(200, gin.H{"status": "ok"})
