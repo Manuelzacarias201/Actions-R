@@ -49,7 +49,7 @@ func HandleGitHubWebhook(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"message": "Evento no manejado"})
 	}
 }
-
+//service
 func handlePing(c *gin.Context) {
 	log.Printf("Ping recibido correctamente")
 	c.JSON(http.StatusOK, gin.H{"message": "Ping recibido correctamente"})
