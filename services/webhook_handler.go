@@ -95,6 +95,13 @@ func handleWorkflowRun(c *gin.Context, payload []byte, handler *WebhookHandler) 
 
 	log.Printf("Procesando Workflow: %s, Estado: %s", workflowEvent.Workflow.Name, workflowEvent.Status)
 
+	// Solo enviar notificación cuando el workflow termine
+	if workflowEvent.Status != "completed" {
+		log.Printf("Workflow aún no ha terminado, estado actual: %s", workflowEvent.Status)
+		c.JSON(http.StatusOK, gin.H{"message": "Workflow en progreso"})
+		return
+	}
+
 	message := formatWorkflowMessage(workflowEvent)
 	log.Printf("Enviando mensaje a Discord (Test): %s", message)
 
@@ -123,9 +130,9 @@ func formatPullRequestMessage(event domain.PullRequestEvent) string {
 	pr := event.PullRequest
 	repo := event.Repository
 
-	status := "❌"
+	emoji := "❌"
 	if action == "closed" && pr.Merged {
-		status = "✅"
+		emoji = "✅"
 		action = "merged"
 	}
 
@@ -136,7 +143,7 @@ func formatPullRequestMessage(event domain.PullRequestEvent) string {
 			"Título: %s\n"+
 			"URL: %s\n"+
 			"Estado: %s",
-		status,
+		emoji,
 		pr.Title,
 		repo.FullName,
 		action,
@@ -147,19 +154,24 @@ func formatPullRequestMessage(event domain.PullRequestEvent) string {
 }
 
 func formatWorkflowMessage(event domain.WorkflowRunEvent) string {
-	status := "❌"
-	if event.Conclusion == "success" {
-		status = "✅"
+
+	emoji := "✅"
+	if event.Conclusion == "failure" {
+		emoji = "❌"
+	} else if event.Conclusion == "success" {
+		emoji = "✅"
+	} else {
+		emoji = "⚠️"
 	}
 
 	return fmt.Sprintf(
-		"**Workflow Run** %s\n"+
+		"**%s Workflow Run**\n"+
 			"Repositorio: %s\n"+
 			"Workflow: %s\n"+
 			"Estado: %s\n"+
 			"Conclusión: %s\n"+
 			"URL: %s",
-		status,
+		emoji,
 		event.Repository.FullName,
 		event.Workflow.Name,
 		event.Status,
