@@ -13,8 +13,8 @@ type Config struct {
 func NewConfig() *Config {
 	return &Config{
 		port:               getEnvOrDefault("PORT", "8080"),
-		discordDevWebhook:  getEnvOrDefault("DISCORD_DEV_WEBHOOK_URL", ""),
-		discordTestWebhook: getEnvOrDefault("DISCORD_TEST_WEBHOOK_URL", ""),
+		discordDevWebhook:  getEnvOrDefault("DISCORD_WEBHOOK_DESARROLO", ""),
+		discordTestWebhook: getEnvOrDefault("DISCORD_WEBHOOK_PRUEBAS", ""),
 	}
 }
 

@@ -45,11 +45,13 @@ func HandleGitHubWebhook(c *gin.Context) {
 	case "workflow_run":
 		handleWorkflowRun(c, payload, handler)
 	default:
+		log.Printf("Evento no manejado: %s", eventType)
 		c.JSON(http.StatusOK, gin.H{"message": "Evento no manejado"})
 	}
 }
 
 func handlePing(c *gin.Context) {
+	log.Printf("Ping recibido correctamente")
 	c.JSON(http.StatusOK, gin.H{"message": "Ping recibido correctamente"})
 }
 
@@ -61,19 +63,25 @@ func handlePullRequest(c *gin.Context, payload []byte, handler *WebhookHandler) 
 		return
 	}
 
+	log.Printf("Procesando Pull Request: %s, Acción: %s", prEvent.PullRequest.Title, prEvent.Action)
+
 	// Solo procesar eventos específicos
 	if !isRelevantPRAction(prEvent.Action) {
+		log.Printf("Acción de PR no relevante: %s", prEvent.Action)
 		c.JSON(http.StatusOK, gin.H{"message": "Acción de PR no relevante"})
 		return
 	}
 
 	message := formatPullRequestMessage(prEvent)
+	log.Printf("Enviando mensaje a Discord (Dev): %s", message)
+
 	if err := handler.discordService.SendDevMessage(message); err != nil {
 		log.Printf("Error al enviar mensaje a Discord: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error al enviar notificación"})
 		return
 	}
 
+	log.Printf("Mensaje enviado exitosamente a Discord")
 	c.JSON(http.StatusOK, gin.H{"message": "Evento procesado correctamente"})
 }
 
@@ -85,13 +93,18 @@ func handleWorkflowRun(c *gin.Context, payload []byte, handler *WebhookHandler) 
 		return
 	}
 
+	log.Printf("Procesando Workflow: %s, Estado: %s", workflowEvent.Workflow.Name, workflowEvent.Status)
+
 	message := formatWorkflowMessage(workflowEvent)
+	log.Printf("Enviando mensaje a Discord (Test): %s", message)
+
 	if err := handler.discordService.SendTestMessage(message); err != nil {
 		log.Printf("Error al enviar mensaje a Discord: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error al enviar notificación"})
 		return
 	}
 
+	log.Printf("Mensaje enviado exitosamente a Discord")
 	c.JSON(http.StatusOK, gin.H{"message": "Evento de workflow procesado correctamente"})
 }
 
