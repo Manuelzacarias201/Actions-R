@@ -1,8 +1,9 @@
 package services
 
 import (
-	"encoding/json"
+	"bytes"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 
@@ -22,35 +23,49 @@ func NewWebhookHandler(discordService *utils.DiscordService) *WebhookHandler {
 	}
 }
 
-func HandleGitHubWebhook(c *gin.Context) {
-	handler := NewWebhookHandler(utils.NewDiscordService())
-
+func (h *WebhookHandler) HandleGitHubWebhook(c *gin.Context) {
 	eventType := c.GetHeader("X-GitHub-Event")
 	deliveryID := c.GetHeader("X-GitHub-Delivery")
+	log.Printf("Evento recibido: %s, Delivery ID: %s", eventType, deliveryID)
 
-	log.Printf("Evento recibido: %s, ID: %s", eventType, deliveryID)
-	log.Printf("Headers recibidos: %+v", c.Request.Header)
+	// Log headers
+	log.Printf("Headers recibidos: %v", c.Request.Header)
 
-	payload, err := c.GetRawData()
-	if err != nil {
-		log.Printf("Error al leer el payload: %v", err)
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Error al leer el payload"})
-		return
-	}
+	// Log payload
+	body, _ := io.ReadAll(c.Request.Body)
+	log.Printf("Payload recibido: %s", string(body))
+	c.Request.Body = io.NopCloser(bytes.NewBuffer(body))
 
-	log.Printf("Payload recibido: %s", string(payload))
-
+	var event interface{}
 	switch eventType {
-	case "ping":
-		handlePing(c)
 	case "pull_request":
-		handlePullRequest(c, payload, handler)
+		event = &domain.PullRequestEvent{}
 	case "workflow_run":
-		handleWorkflowRun(c, payload, handler)
+		event = &domain.WorkflowRunEvent{}
+	case "workflow_job":
+		event = &domain.WorkflowJobEvent{}
 	default:
 		log.Printf("Evento no manejado: %s", eventType)
 		c.JSON(http.StatusOK, gin.H{"message": "Evento no manejado"})
+		return
 	}
+
+	if err := c.ShouldBindJSON(event); err != nil {
+		log.Printf("Error al decodificar el evento: %v", err)
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	switch e := event.(type) {
+	case *domain.PullRequestEvent:
+		h.handlePullRequestEvent(e)
+	case *domain.WorkflowRunEvent:
+		h.handleWorkflowRunEvent(e)
+	case *domain.WorkflowJobEvent:
+		h.handleWorkflowJobEvent(e)
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Evento procesado"})
 }
 
 func handlePing(c *gin.Context) {
@@ -58,71 +73,78 @@ func handlePing(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Ping recibido correctamente"})
 }
 
-func handlePullRequest(c *gin.Context, payload []byte, handler *WebhookHandler) {
-	var prEvent domain.PullRequestEvent
-	if err := json.Unmarshal(payload, &prEvent); err != nil {
-		log.Printf("Error al deserializar el evento: %v", err)
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Error al procesar el evento"})
-		return
-	}
-
-	log.Printf("Procesando Pull Request: %s, Acción: %s", prEvent.PullRequest.Title, prEvent.Action)
+func (h *WebhookHandler) handlePullRequestEvent(event *domain.PullRequestEvent) {
+	log.Printf("Procesando Pull Request: %s, Acción: %s", event.PullRequest.Title, event.Action)
 
 	// Solo procesar eventos específicos
-	if !isRelevantPRAction(prEvent.Action) {
-		log.Printf("Acción de PR no relevante: %s", prEvent.Action)
-		c.JSON(http.StatusOK, gin.H{"message": "Acción de PR no relevante"})
+	if !isRelevantPRAction(event.Action) {
+		log.Printf("Acción de PR no relevante: %s", event.Action)
 		return
 	}
 
-	message := formatPullRequestMessage(prEvent)
+	message := formatPullRequestMessage(*event)
 	log.Printf("Enviando mensaje a Discord (Dev): %s", message)
 
-	if err := handler.discordService.SendDevMessage(message); err != nil {
+	if err := h.discordService.SendDevMessage(message); err != nil {
 		log.Printf("Error al enviar mensaje a Discord: %v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error al enviar notificación"})
-		return
 	}
-
-	log.Printf("Mensaje enviado exitosamente a Discord")
-	c.JSON(http.StatusOK, gin.H{"message": "Evento procesado correctamente"})
 }
 
-func handleWorkflowRun(c *gin.Context, payload []byte, handler *WebhookHandler) {
-	var workflowEvent domain.WorkflowRunEvent
-	if err := json.Unmarshal(payload, &workflowEvent); err != nil {
-		log.Printf("Error al deserializar el evento de workflow: %v", err)
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Error al procesar el evento"})
-		return
-	}
-
+func (h *WebhookHandler) handleWorkflowRunEvent(event *domain.WorkflowRunEvent) {
 	log.Printf("Detalles del evento de workflow:")
-	log.Printf("- Nombre del workflow: %s", workflowEvent.Workflow.Name)
-	log.Printf("- Estado: %s", workflowEvent.Status)
-	log.Printf("- Conclusión: %s", workflowEvent.Conclusion)
-	log.Printf("- Repositorio: %s", workflowEvent.Repository.FullName)
-	log.Printf("- URL: %s", workflowEvent.HTMLURL)
-	log.Printf("- Evento que lo activó: %s", workflowEvent.Event)
-	log.Printf("- Rama: %s", workflowEvent.HeadBranch)
+	log.Printf("- Nombre del workflow: %s", event.Workflow.Name)
+	log.Printf("- Estado: %s", event.Status)
+	log.Printf("- Conclusión: %s", event.Conclusion)
+	log.Printf("- Repositorio: %s", event.Repository.FullName)
+	log.Printf("- URL: %s", event.HTMLURL)
+	log.Printf("- Evento que lo activó: %s", event.Event)
+	log.Printf("- Rama: %s", event.HeadBranch)
 
 	// Solo enviar notificación cuando el workflow termine
-	if workflowEvent.Status != "completed" {
-		log.Printf("Workflow aún no ha terminado, estado actual: %s", workflowEvent.Status)
-		c.JSON(http.StatusOK, gin.H{"message": "Workflow en progreso"})
+	if event.Status != "completed" {
+		log.Printf("Workflow aún no ha terminado, estado actual: %s", event.Status)
 		return
 	}
 
-	message := formatWorkflowMessage(workflowEvent)
+	message := formatWorkflowMessage(*event)
 	log.Printf("Enviando mensaje a Discord (Test): %s", message)
 
-	if err := handler.discordService.SendTestMessage(message); err != nil {
+	if err := h.discordService.SendTestMessage(message); err != nil {
 		log.Printf("Error al enviar mensaje a Discord: %v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error al enviar notificación"})
-		return
 	}
+}
 
-	log.Printf("Mensaje enviado exitosamente a Discord")
-	c.JSON(http.StatusOK, gin.H{"message": "Evento de workflow procesado correctamente"})
+func (h *WebhookHandler) handleWorkflowJobEvent(event *domain.WorkflowJobEvent) {
+	log.Printf("Procesando evento workflow_job: %s", event.Action)
+
+	// Solo enviamos notificaciones cuando el job se completa
+	if event.Action == "completed" {
+		emoji := "✅"
+		if event.WorkflowJob.Conclusion != "success" {
+			emoji = "❌"
+		}
+
+		message := fmt.Sprintf("%s **Workflow Job Completado**\n\n"+
+			"**Repositorio:** %s\n"+
+			"**Job:** %s\n"+
+			"**Estado:** %s\n"+
+			"**Conclusión:** %s\n"+
+			"**URL:** %s\n"+
+			"**Iniciado:** %s\n"+
+			"**Completado:** %s",
+			emoji,
+			event.Repository.FullName,
+			event.WorkflowJob.Name,
+			event.WorkflowJob.Status,
+			event.WorkflowJob.Conclusion,
+			event.WorkflowJob.HTMLURL,
+			event.WorkflowJob.StartedAt,
+			event.WorkflowJob.CompletedAt)
+
+		if err := h.discordService.SendTestMessage(message); err != nil {
+			log.Printf("Error al enviar mensaje a Discord: %v", err)
+		}
+	}
 }
 
 func isRelevantPRAction(action string) bool {
