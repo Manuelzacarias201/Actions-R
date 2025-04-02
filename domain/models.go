@@ -37,17 +37,32 @@ type Head struct {
 }
 
 type WorkflowRunEvent struct {
-	Action     string     `json:"action"`
-	Workflow   Workflow   `json:"workflow"`
-	Repository Repository `json:"repository"`
-	Status     string     `json:"status"`
-	Conclusion string     `json:"conclusion"`
-	HTMLURL    string     `json:"html_url"`
-	CreatedAt  string     `json:"created_at"`
-	UpdatedAt  string     `json:"updated_at"`
+	Action          string     `json:"action"`
+	Workflow        Workflow   `json:"workflow"`
+	Repository      Repository `json:"repository"`
+	Status          string     `json:"status"`
+	Conclusion      string     `json:"conclusion"`
+	HTMLURL         string     `json:"html_url"`
+	CreatedAt       string     `json:"created_at"`
+	UpdatedAt       string     `json:"updated_at"`
+	HeadBranch      string     `json:"head_branch"`
+	HeadCommit      Commit     `json:"head_commit"`
+	Event           string     `json:"event"`
+	RunAttempt      int        `json:"run_attempt"`
+	RunStartedAt    string     `json:"run_started_at"`
+	TriggeringActor User       `json:"triggering_actor"`
 }
 
 type Workflow struct {
 	Name string `json:"name"`
 	ID   int    `json:"id"`
+}
+
+type Commit struct {
+	ID        string `json:"id"`
+	TreeID    string `json:"tree_id"`
+	Message   string `json:"message"`
+	Timestamp string `json:"timestamp"`
+	Author    User   `json:"author"`
+	Committer User   `json:"committer"`
 }

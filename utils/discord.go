@@ -22,6 +22,10 @@ func NewDiscordService() *DiscordService {
 	devWebhook := os.Getenv("DISCORD_WEBHOOK_DESARROLO")
 	testWebhook := os.Getenv("DISCORD_WEBHOOK_PRUEBAS")
 
+	log.Printf("Configuración de Discord:")
+	log.Printf("DISCORD_WEBHOOK_DESARROLO: %s", devWebhook)
+	log.Printf("DISCORD_WEBHOOK_PRUEBAS: %s", testWebhook)
+
 	if devWebhook == "" {
 		log.Printf("ADVERTENCIA: DISCORD_WEBHOOK_DESARROLO no está configurado")
 	}
@@ -39,6 +43,7 @@ func (s *DiscordService) SendDevMessage(content string) error {
 	if s.devWebhookURL == "" {
 		return fmt.Errorf("DISCORD_WEBHOOK_DESARROLO no está configurado")
 	}
+	log.Printf("Intentando enviar mensaje al canal de desarrollo: %s", content)
 	return s.sendMessage(s.devWebhookURL, content)
 }
 
@@ -46,6 +51,7 @@ func (s *DiscordService) SendTestMessage(content string) error {
 	if s.testWebhookURL == "" {
 		return fmt.Errorf("DISCORD_WEBHOOK_PRUEBAS no está configurado")
 	}
+	log.Printf("Intentando enviar mensaje al canal de pruebas: %s", content)
 	return s.sendMessage(s.testWebhookURL, content)
 }
 
@@ -60,6 +66,7 @@ func (s *DiscordService) sendMessage(webhookURL, content string) error {
 	}
 
 	log.Printf("Enviando mensaje a Discord URL: %s", webhookURL)
+	log.Printf("Contenido del mensaje: %s", string(jsonData))
 
 	resp, err := http.Post(
 		webhookURL,

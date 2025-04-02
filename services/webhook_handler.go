@@ -29,6 +29,7 @@ func HandleGitHubWebhook(c *gin.Context) {
 	deliveryID := c.GetHeader("X-GitHub-Delivery")
 
 	log.Printf("Evento recibido: %s, ID: %s", eventType, deliveryID)
+	log.Printf("Headers recibidos: %+v", c.Request.Header)
 
 	payload, err := c.GetRawData()
 	if err != nil {
@@ -36,6 +37,8 @@ func HandleGitHubWebhook(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Error al leer el payload"})
 		return
 	}
+
+	log.Printf("Payload recibido: %s", string(payload))
 
 	switch eventType {
 	case "ping":
@@ -93,7 +96,10 @@ func handleWorkflowRun(c *gin.Context, payload []byte, handler *WebhookHandler) 
 		return
 	}
 
-	log.Printf("Procesando Workflow: %s, Estado: %s", workflowEvent.Workflow.Name, workflowEvent.Status)
+	log.Printf("Procesando Workflow: %s, Estado: %s, Conclusión: %s",
+		workflowEvent.Workflow.Name,
+		workflowEvent.Status,
+		workflowEvent.Conclusion)
 
 	// Solo enviar notificación cuando el workflow termine
 	if workflowEvent.Status != "completed" {
@@ -154,7 +160,6 @@ func formatPullRequestMessage(event domain.PullRequestEvent) string {
 }
 
 func formatWorkflowMessage(event domain.WorkflowRunEvent) string {
-
 	emoji := "✅"
 	if event.Conclusion == "failure" {
 		emoji = "❌"
@@ -162,6 +167,15 @@ func formatWorkflowMessage(event domain.WorkflowRunEvent) string {
 		emoji = "✅"
 	} else {
 		emoji = "⚠️"
+	}
+
+	status := "✅ Éxito"
+	if event.Conclusion == "failure" {
+		status = "❌ Fallo"
+	} else if event.Conclusion == "success" {
+		status = "✅ Éxito"
+	} else {
+		status = "⚠️ Otro"
 	}
 
 	return fmt.Sprintf(
@@ -174,7 +188,7 @@ func formatWorkflowMessage(event domain.WorkflowRunEvent) string {
 		emoji,
 		event.Repository.FullName,
 		event.Workflow.Name,
-		event.Status,
+		status,
 		event.Conclusion,
 		event.HTMLURL,
 	)
