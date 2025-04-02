@@ -12,7 +12,8 @@ type notificationService struct {
 	channelRepo      ports.ChannelRepository
 }
 
-// NewNotificationService crea una nueva instancia del servicio de notificaciones
+// NewNotificationService crea una nueva instancia del servicio de notificaciones 
+//pruebas-02
 func NewNotificationService(notificationRepo ports.NotificationRepository, channelRepo ports.ChannelRepository) ports.NotificationService {
 	return &notificationService{
 		notificationRepo: notificationRepo,
