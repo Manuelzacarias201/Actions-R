@@ -148,41 +148,54 @@ func (h *WebhookHandler) handleWorkflowJobEvent(event *domain.WorkflowJobEvent) 
 }
 
 func isRelevantPRAction(action string) bool {
-	relevantActions := map[string]bool{
-		"opened":           true,
-		"reopened":         true,
-		"ready_for_review": true,
-		"closed":           true,
+	relevantActions := []string{
+		"opened",
+		"reopened",
+		"ready_for_review",
+		"closed", // Para detectar cuando se fusiona
 	}
-	return relevantActions[action]
+	for _, a := range relevantActions {
+		if a == action {
+			return true
+		}
+	}
+	return false
 }
 
 func formatPullRequestMessage(event domain.PullRequestEvent) string {
-	action := event.Action
-	pr := event.PullRequest
-	repo := event.Repository
-
-	emoji := "❌"
-	if action == "closed" && pr.Merged {
-		emoji = "✅"
-		action = "merged"
+	emoji := "📝"
+	action := "creado"
+	switch event.Action {
+	case "reopened":
+		emoji = "🔄"
+		action = "reabierto"
+	case "ready_for_review":
+		emoji = "👀"
+		action = "listo para revisión"
+	case "closed":
+		if event.PullRequest.Merged {
+			emoji = "✅"
+			action = "fusionado exitosamente"
+		} else {
+			emoji = "❌"
+			action = "cerrado sin fusionar"
+		}
 	}
 
-	return fmt.Sprintf(
-		"**%s Pull Request** %s\n"+
-			"Repositorio: %s\n"+
-			"Acción: %s\n"+
-			"Título: %s\n"+
-			"URL: %s\n"+
-			"Estado: %s",
+	return fmt.Sprintf("%s **Nuevo Pull Request %s**\n\n"+
+		"**Título:** %s\n"+
+		"**Autor:** %s\n"+
+		"**Rama:** %s → %s\n"+
+		"**URL:** %s\n"+
+		"**Descripción:**\n%s",
 		emoji,
-		pr.Title,
-		repo.FullName,
 		action,
-		pr.Title,
-		pr.HTMLURL,
-		pr.State,
-	)
+		event.PullRequest.Title,
+		event.PullRequest.User.Login,
+		event.PullRequest.Head.Ref,
+		event.PullRequest.Base.Ref,
+		event.PullRequest.HTMLURL,
+		event.PullRequest.Body)
 }
 
 func formatWorkflowMessage(event domain.WorkflowRunEvent) string {
