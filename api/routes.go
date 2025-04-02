@@ -3,6 +3,7 @@ package api
 //ss
 import (
 	"github_webhook/services"
+	"github_webhook/utils"
 
 	"github.com/gin-gonic/gin"
 )
@@ -15,9 +16,12 @@ func SetupRoutes(router *gin.Engine) {
 		})
 	})
 
+	discordService := utils.NewDiscordService()
+	handler := services.NewWebhookHandler(discordService)
+
 	webhookGroup := router.Group("/webhook")
 	{
-		webhookGroup.POST("/github", services.HandleGitHubWebhook)
+		webhookGroup.POST("/github", handler.HandleGitHubWebhook)
 	}
 }
 
