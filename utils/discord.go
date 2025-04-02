@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"os"
@@ -62,24 +63,38 @@ func (s *DiscordService) sendMessage(webhookURL, content string) error {
 
 	jsonData, err := json.Marshal(message)
 	if err != nil {
+		log.Printf("Error al serializar el mensaje: %v", err)
 		return fmt.Errorf("error al serializar el mensaje: %v", err)
 	}
 
-	log.Printf("Enviando mensaje a Discord URL: %s", webhookURL)
-	log.Printf("Contenido del mensaje: %s", string(jsonData))
+	log.Printf("Enviando mensaje a Discord:")
+	log.Printf("- URL: %s", webhookURL)
+	log.Printf("- Contenido: %s", string(jsonData))
 
-	resp, err := http.Post(
-		webhookURL,
-		"application/json",
-		bytes.NewBuffer(jsonData),
-	)
+	req, err := http.NewRequest("POST", webhookURL, bytes.NewBuffer(jsonData))
 	if err != nil {
+		log.Printf("Error al crear la petición: %v", err)
+		return fmt.Errorf("error al crear la petición: %v", err)
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		log.Printf("Error al enviar la petición: %v", err)
 		return fmt.Errorf("error al enviar mensaje a Discord: %v", err)
 	}
 	defer resp.Body.Close()
 
+	log.Printf("Respuesta de Discord:")
+	log.Printf("- Status Code: %d", resp.StatusCode)
+	log.Printf("- Status: %s", resp.Status)
+
 	if resp.StatusCode != http.StatusNoContent && resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("error en la respuesta de Discord: %d", resp.StatusCode)
+		body, _ := io.ReadAll(resp.Body)
+		log.Printf("Cuerpo de la respuesta de error: %s", string(body))
+		return fmt.Errorf("error en la respuesta de Discord: %d - %s", resp.StatusCode, resp.Status)
 	}
 
 	log.Printf("Mensaje enviado exitosamente a Discord")

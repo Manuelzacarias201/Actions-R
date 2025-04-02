@@ -57,12 +57,3 @@ type Workflow struct {
 	Name string `json:"name"`
 	ID   int    `json:"id"`
 }
-
-type Commit struct {
-	ID        string `json:"id"`
-	TreeID    string `json:"tree_id"`
-	Message   string `json:"message"`
-	Timestamp string `json:"timestamp"`
-	Author    User   `json:"author"`
-	Committer User   `json:"committer"`
-}

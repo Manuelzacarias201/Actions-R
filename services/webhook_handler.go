@@ -96,10 +96,14 @@ func handleWorkflowRun(c *gin.Context, payload []byte, handler *WebhookHandler) 
 		return
 	}
 
-	log.Printf("Procesando Workflow: %s, Estado: %s, Conclusión: %s",
-		workflowEvent.Workflow.Name,
-		workflowEvent.Status,
-		workflowEvent.Conclusion)
+	log.Printf("Detalles del evento de workflow:")
+	log.Printf("- Nombre del workflow: %s", workflowEvent.Workflow.Name)
+	log.Printf("- Estado: %s", workflowEvent.Status)
+	log.Printf("- Conclusión: %s", workflowEvent.Conclusion)
+	log.Printf("- Repositorio: %s", workflowEvent.Repository.FullName)
+	log.Printf("- URL: %s", workflowEvent.HTMLURL)
+	log.Printf("- Evento que lo activó: %s", workflowEvent.Event)
+	log.Printf("- Rama: %s", workflowEvent.HeadBranch)
 
 	// Solo enviar notificación cuando el workflow termine
 	if workflowEvent.Status != "completed" {
