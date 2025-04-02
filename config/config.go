@@ -9,7 +9,7 @@ type Config struct {
 	discordDevWebhook  string
 	discordTestWebhook string
 }
-
+//oo
 func NewConfig() *Config {
 	return &Config{
 		port:               getEnvOrDefault("PORT", "8080"),
